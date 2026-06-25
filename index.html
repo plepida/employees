@@ -921,10 +921,7 @@ function importExcel(event){
         }
       });
       save(); populateYearFilter(); updateStats(); renderList(); checkAlerts();
-      alert('Εισαγωγή ολοκληρώθηκε!
-✅ Νέοι: '+added+'
-🔄 Ενημερώθηκαν: '+updated+'
-⏭ Χωρίς αλλαγές: '+skipped);
+      alert('Εισαγωγή ολοκληρώθηκε!\n✅ Νέοι: '+added+'\n🔄 Ενημερώθηκαν: '+updated+'\n⏭ Χωρίς αλλαγές: '+skipped);
     }catch(err){
       console.error(err);
       alert('Σφάλμα κατά την εισαγωγή. Βεβαιώσου ότι το αρχείο έχει τη σωστή γραμμογράφηση.');
