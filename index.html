@@ -6,6 +6,19 @@
 <title>Παρακολούθηση Εργαζομένων</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+/* Multiselect contract filter */
+.ms-wrap{position:relative;display:inline-block}
+.ms-btn{padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;cursor:pointer;min-width:160px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:6px;color:#1a1a1a}
+.ms-btn:hover{border-color:#bbb}
+.ms-btn.active-filter{border-color:#1a1a1a;border-width:1.5px}
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;min-width:210px;padding:6px 0;max-height:280px;overflow-y:auto}
+.ms-dropdown.open{display:block}
+.ms-option{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px}
+.ms-option:hover{background:#f5f5f3}
+.ms-option input[type=checkbox]{width:14px;height:14px;accent-color:#1a1a1a;cursor:pointer;flex-shrink:0}
+.ms-footer{padding:6px 14px;border-top:1px solid #f0efeb;margin-top:2px;font-size:12px;color:#888;cursor:pointer;text-align:center}
+.ms-footer:hover{color:#1a1a1a}
+
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;background:#f5f5f3;color:#1a1a1a;min-height:100vh}
 .topbar{background:#fff;border-bottom:1px solid #e0dfd8;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
@@ -107,6 +120,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
       <option value="inactive">Αποχωρήσαντες</option>
     </select>
     <select id="filterCompany" onchange="renderList()" style="max-width:150px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="">Όλες οι εταιρείες</option></select>
+    <div class="ms-wrap" id="contractFilterWrap">
+      <button class="ms-btn" id="contractFilterBtn" onclick="toggleMsDropdown()">
+        <span id="contractFilterLabel">Τύπος Σύμβασης</span><span>▾</span>
+      </button>
+      <div class="ms-dropdown" id="contractFilterDropdown">
+        <div id="contractFilterOptions"></div>
+        <div class="ms-footer" onclick="clearContractFilter()">Καθαρισμός επιλογής</div>
+      </div>
+    </div>
     <button class="btn btn-sm" onclick="clearFilters()">✕ Καθαρισμός</button>
     <label class="btn btn-sm" style="cursor:pointer" title="Εισαγωγή από Excel">⬆ Import Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(event)"></label>
     <span id="listCount" style="font-size:13px;color:#999;margin-left:auto"></span>
@@ -168,7 +190,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
         </div>
         <div id="firstAidDateBox" style="display:none;margin-top:6px">
           <label style="margin-top:0">Ημ/νία Πιστοποίησης</label>
-          <input id="f-firstaid-date" type="date" style="max-width:180px">
+          <input id="f-firstaid-date" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" style="max-width:140px" oninput="formatDateInput(this)">
         </div>
       </div>
     </div>
@@ -183,8 +205,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
           <option value="">-- Επιλογή --</option>
         </select>
       </div>
-      <div><label>Έναρξη *</label><input id="f-start" type="date"></div>
-      <div><label>Λήξη</label><input id="f-end" type="date"></div>
+      <div><label>Έναρξη *</label><input id="f-start" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
+      <div><label>Λήξη</label><input id="f-end" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
     </div>
     <div style="margin-top:4px">
       <label>Φορέας Πρακτικής <span style="font-size:11px;color:#aaa;font-weight:400">(συμπλήρωσε μόνο αν αφορά πρακτική)</span></label>
@@ -380,7 +402,7 @@ function switchTab(id, idx){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.tab')[idx].classList.add('active');
-  if(id==='list') renderList();
+  if(id==='list'){ populateContractFilter(); renderList(); }
   if(id==='trainings-tab'){ renderTrainEmpSelect(); renderTrainings(); populateTrainFilterSelect(); }
   if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageCities(); renderManageBuildings(); renderManageTrainings(); loadFaParams(); }
   checkAlerts();
@@ -439,6 +461,31 @@ function checkAlerts(){
     return list;
   });
   box.innerHTML=alerts.join('');
+}
+
+// ─── Date helpers (dd/mm/yyyy ↔ yyyy-mm-dd) ──────────────────────────────────
+function formatDateInput(el){
+  // Auto-insert slashes as user types
+  let v=el.value.replace(/[^0-9]/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5);
+  el.value=v.slice(0,10);
+}
+
+function toISO(dmy){
+  // dd/mm/yyyy → yyyy-mm-dd
+  if(!dmy) return '';
+  const p=dmy.trim().split('/');
+  if(p.length!==3||p[2].length!==4) return '';
+  return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+function fromISO(iso){
+  // yyyy-mm-dd → dd/mm/yyyy
+  if(!iso) return '';
+  const p=iso.split('-');
+  if(p.length!==3) return '';
+  return `${p[2]}/${p[1]}/${p[0]}`;
 }
 
 function toggleFirstAidDate(){
@@ -536,6 +583,64 @@ function clearFilters(){
   document.getElementById('filterYear').value='';
   document.getElementById('filterStatus').value='active';
   document.getElementById('filterCompany').value='';
+  selectedContracts.clear();
+  populateContractFilter();
+  renderList();
+}
+
+// ─── Multiselect contract filter ─────────────────────────────────────────────
+let selectedContracts=new Set();
+
+function toggleMsDropdown(){
+  const dd=document.getElementById('contractFilterDropdown');
+  dd.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('contractFilterWrap');
+  if(wrap && !wrap.contains(e.target)){
+    document.getElementById('contractFilterDropdown').classList.remove('open');
+  }
+});
+
+function populateContractFilter(){
+  const container=document.getElementById('contractFilterOptions');
+  if(!container) return;
+  container.innerHTML=params.contractTypes.map(ct=>`
+    <label class="ms-option">
+      <input type="checkbox" value="${ct}" ${selectedContracts.has(ct)?'checked':''}
+        onchange="toggleContractOption('${ct.replace(/'/g,"\'")}',this.checked)">
+      ${ct}
+    </label>`).join('');
+  updateContractFilterLabel();
+}
+
+function toggleContractOption(ct,checked){
+  if(checked) selectedContracts.add(ct);
+  else selectedContracts.delete(ct);
+  updateContractFilterLabel();
+  renderList();
+}
+
+function updateContractFilterLabel(){
+  const btn=document.getElementById('contractFilterBtn');
+  const lbl=document.getElementById('contractFilterLabel');
+  if(selectedContracts.size===0){
+    lbl.textContent='Τύπος Σύμβασης';
+    btn.classList.remove('active-filter');
+  } else if(selectedContracts.size===1){
+    lbl.textContent=[...selectedContracts][0];
+    btn.classList.add('active-filter');
+  } else {
+    lbl.textContent=`${selectedContracts.size} τύποι`;
+    btn.classList.add('active-filter');
+  }
+}
+
+function clearContractFilter(){
+  selectedContracts.clear();
+  populateContractFilter();
   renderList();
 }
 
@@ -553,7 +658,8 @@ function renderList(){
     const matchY=!yr||(e.year||'')==yr;
     const matchS=status==='all'||(status==='active'&&!e.inactive)||(status==='inactive'&&e.inactive);
     const matchCo=!co||(e.company||'')==co;
-    return matchQ&&matchY&&matchS&&matchCo;
+    const matchCt=selectedContracts.size===0||selectedContracts.has(e.contractType||'');
+    return matchQ&&matchY&&matchS&&matchCo&&matchCt;
   });
   if(employees.length===0){ list.innerHTML=''; noEmp.style.display='block'; document.getElementById('listCount').textContent=''; return; }
   noEmp.style.display='none';
@@ -582,7 +688,7 @@ function renderList(){
         <div style="display:flex;gap:6px">${badge}</div>
       </div>
       <div class="emp-badges">
-        ${emp.contractType?`<span class="badge badge-info">${emp.contractType}</span>`:''}
+        ${emp.contractType?`<span class="badge badge-info" style="cursor:default">${emp.contractType}</span>`:''}
         ${emp.contractStart?`<span style="font-size:11px;color:#999">από ${formatDate(emp.contractStart)}</span>`:''}
         <span style="font-size:11px;color:#999;margin-left:auto">🎓 ${done}/${total}</span>
       </div>
@@ -642,8 +748,8 @@ function addRenewal(r={}){
           <option value="">-- Επιλογή --</option>
           ${typeOpts}
         </select></div>
-      <div><label>Έναρξη</label><input id="${id}_start" type="date" value="${r.start||''}"></div>
-      <div><label>Λήξη</label><input id="${id}_end" type="date" value="${r.end||''}"></div>
+      <div><label>Έναρξη</label><input id="${id}_start" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
+      <div><label>Λήξη</label><input id="${id}_end" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
     </div>`;
   document.getElementById('renewalList').appendChild(div);
   if(r.type) document.getElementById(id+'_type').value=r.type;
@@ -654,8 +760,8 @@ function getRenewals(){
     const id=el.id;
     return {
       type:document.getElementById(id+'_type')?.value||'',
-      start:document.getElementById(id+'_start')?.value||'',
-      end:document.getElementById(id+'_end')?.value||''
+      start:toISO(document.getElementById(id+'_start')?.value||''),
+      end:toISO(document.getElementById(id+'_end')?.value||'')
     };
   });
 }
@@ -696,14 +802,14 @@ function editEmployee(id){
   document.getElementById('f-city').value=emp.city||'';
   document.getElementById('f-building').value=emp.building||'';
   document.getElementById('f-firstaid').checked=emp.firstAid||false;
-  document.getElementById('f-firstaid-date').value=emp.firstAidDate||'';
+  document.getElementById('f-firstaid-date').value=fromISO(emp.firstAidDate||'');
   document.getElementById('firstAidDateBox').style.display=(emp.firstAid)?'block':'none';
   document.getElementById('f-corp-email').value=emp.corpEmail||'';
   document.getElementById('f-corp-phone').value=emp.corpPhone||'';
   document.getElementById('f-ext').value=emp.ext||'';
   document.getElementById('f-contract').value=emp.contractType||'';
-  document.getElementById('f-start').value=emp.contractStart||'';
-  document.getElementById('f-end').value=emp.contractEnd||'';
+  document.getElementById('f-start').value=fromISO(emp.contractStart||'');
+  document.getElementById('f-end').value=fromISO(emp.contractEnd||'');
   document.getElementById('f-practice').value=emp.practiceOrg||'';
   renewalCount=0;
   document.getElementById('renewalList').innerHTML='';
@@ -737,13 +843,13 @@ function saveEmployee(){
     city:document.getElementById('f-city').value,
     building:document.getElementById('f-building').value,
     firstAid:document.getElementById('f-firstaid').checked,
-    firstAidDate:document.getElementById('f-firstaid-date').value,
+    firstAidDate:toISO(document.getElementById('f-firstaid-date').value),
     corpEmail:document.getElementById('f-corp-email').value.trim(),
     corpPhone:document.getElementById('f-corp-phone').value.trim(),
     ext:document.getElementById('f-ext').value.trim(),
     contractType:document.getElementById('f-contract').value,
-    contractStart:document.getElementById('f-start').value,
-    contractEnd:document.getElementById('f-end').value,
+    contractStart:toISO(document.getElementById('f-start').value),
+    contractEnd:toISO(document.getElementById('f-end').value),
     practiceOrg:document.getElementById('f-practice').value.trim(),
     renewals:getRenewals(),
     trainings:editingId?(employees.find(e=>e.id===editingId)||{}).trainings||{}:{}
@@ -830,7 +936,7 @@ function toggleTraining(empId,training,done){
 function updateTrainingDate(empId,training,newDate){
   const emp=employees.find(e=>e.id===empId);
   if(!emp||!emp.trainings) return;
-  emp.trainings[training]={done:true,date:newDate};
+  emp.trainings[training]={done:true,date:toISO(newDate)||newDate};
   save();
 }
 
@@ -926,7 +1032,7 @@ function addParam(key, inputId){
   save(); inp.value='';
   if(key==='teams') renderManageTeams();
   if(key==='roles') renderManageRoles();
-  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
+  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); populateContractFilter(); }
   if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
   if(key==='cities'){ renderManageCities(); populateSelects(); }
   if(key==='buildings'){ renderManageBuildings(); populateSelects(); updateStats(); }
@@ -939,7 +1045,7 @@ function removeParam(key,i,containerId){
   save();
   if(key==='teams') renderManageTeams();
   if(key==='roles') renderManageRoles();
-  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
+  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); populateContractFilter(); }
   if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
   if(key==='cities'){ renderManageCities(); populateSelects(); }
   if(key==='buildings'){ renderManageBuildings(); populateSelects(); updateStats(); }
@@ -1144,6 +1250,7 @@ function restoreJSON(event){
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 populateSelects();
+populateContractFilter();
 populateYearFilter();
 updateStats();
 renderList();
