@@ -160,9 +160,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
     <div class="grid3" style="margin-top:0">
       <div><label>Πόλη Εργασίας</label><select id="f-city"><option value="">-- Επιλογή --</option></select></div>
       <div><label>Κτήριο Εργασίας</label><select id="f-building"><option value="">-- Επιλογή --</option></select></div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:22px">
-        <input type="checkbox" id="f-firstaid" style="width:auto;accent-color:#065f46;width:16px;height:16px;cursor:pointer">
-        <label for="f-firstaid" style="margin:0;font-size:13px;color:#1a1a1a;cursor:pointer;font-weight:500">Πρώτες Βοήθειες ✚</label>
+      <div>
+        <label>Πρώτες Βοήθειες ✚</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+          <input type="checkbox" id="f-firstaid" style="width:16px;height:16px;accent-color:#065f46;cursor:pointer" onchange="toggleFirstAidDate()">
+          <label for="f-firstaid" style="margin:0;font-size:13px;cursor:pointer">Έχει πιστοποίηση</label>
+        </div>
+        <div id="firstAidDateBox" style="display:none;margin-top:6px">
+          <label style="margin-top:0">Ημ/νία Πιστοποίησης</label>
+          <input id="f-firstaid-date" type="date" style="max-width:180px">
+        </div>
       </div>
     </div>
   </div>
@@ -308,6 +315,28 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
   </div>
 
   <div class="card">
+    <div class="card-title" style="margin-bottom:10px">✚ Παράμετροι Πρώτων Βοηθειών</div>
+    <div class="grid2" style="gap:0 20px">
+      <div>
+        <label>Ελάχιστο ποσοστό πιστοποίησης ανά κτήριο (%)</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <input id="faThresholdInput" type="number" min="1" max="100" style="max-width:80px"
+            value="" oninput="updateFaParam('firstAidThreshold',this.value)">
+          <span style="font-size:12px;color:#888">% (πράσινο αν πάνω από αυτό)</span>
+        </div>
+      </div>
+      <div>
+        <label>Διάρκεια ισχύος πιστοποίησης (χρόνια)</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <input id="faYearsInput" type="number" min="1" max="10" style="max-width:80px"
+            value="" oninput="updateFaParam('firstAidYears',this.value)">
+          <span style="font-size:12px;color:#888">χρόνια</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title" style="margin-bottom:10px">🎓 Εκπαιδεύσεις</div>
     <p style="font-size:13px;color:#888;margin-bottom:12px">Οι αλλαγές εφαρμόζονται αυτόματα σε όλους τους εργαζομένους.</p>
     <div style="display:flex;gap:6px;margin-bottom:10px">
@@ -333,7 +362,9 @@ let params = JSON.parse(localStorage.getItem('emp_v2_params')||'null') || {
   contractTypes:['Αορίστου Χρόνου','Ορισμένου Χρόνου','Πρακτική Άσκηση','Freelance','Μερικής Απασχόλησης'],
   companies:['OTS','BlueValue'],
   cities:[],
-  buildings:[]
+  buildings:[],
+  firstAidThreshold:50,
+  firstAidYears:3
 };
 let editingId = null;
 let renewalCount = 0;
@@ -351,7 +382,7 @@ function switchTab(id, idx){
   document.querySelectorAll('.tab')[idx].classList.add('active');
   if(id==='list') renderList();
   if(id==='trainings-tab'){ renderTrainEmpSelect(); renderTrainings(); populateTrainFilterSelect(); }
-  if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageCities(); renderManageBuildings(); renderManageTrainings(); }
+  if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageCities(); renderManageBuildings(); renderManageTrainings(); loadFaParams(); }
   checkAlerts();
 }
 
@@ -383,14 +414,37 @@ function contractStatus(emp){
 // ─── Alerts ───────────────────────────────────────────────────────────────────
 function checkAlerts(){
   const box=document.getElementById('alertsBox');
-  const html=employees.flatMap(emp=>{
+  const years=params.firstAidYears||3;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const alerts=employees.flatMap(emp=>{
+    const list=[];
+    // Contract alerts
     const st=contractStatus(emp);
-    if(!st||st.type==='ok') return [];
-    const cls=st.type==='danger'?'alert-danger':'alert-warn';
-    const icon=st.type==='danger'?'🔴':'🟡';
-    return [`<div class="alert ${cls}">${icon} <strong>${emp.name}</strong>: ${st.label} — λήξη ${formatDate(st.date)}</div>`];
-  }).join('');
-  box.innerHTML=html;
+    if(st&&st.type!=='ok'){
+      const cls=st.type==='danger'?'alert-danger':'alert-warn';
+      const icon=st.type==='danger'?'🔴':'🟡';
+      list.push(`<div class="alert ${cls}">${icon} <strong>${emp.name}</strong>: ${st.label} — λήξη ${formatDate(st.date)}</div>`);
+    }
+    // First aid expiry alerts (only active employees with date)
+    if(!emp.inactive && emp.firstAid && emp.firstAidDate){
+      const expiry=new Date(emp.firstAidDate);
+      expiry.setFullYear(expiry.getFullYear()+years);
+      const daysLeft=Math.floor((expiry-today)/86400000);
+      if(daysLeft<0){
+        list.push(`<div class="alert alert-danger">✚ <strong>${emp.name}</strong>: Η πιστοποίηση Πρώτων Βοηθειών έληξε στις ${formatDate(expiry.toISOString().split('T')[0])}</div>`);
+      } else if(daysLeft<=60){
+        list.push(`<div class="alert alert-warn">✚ <strong>${emp.name}</strong>: Η πιστοποίηση Πρώτων Βοηθειών λήγει σε ${daysLeft} μέρες (${formatDate(expiry.toISOString().split('T')[0])})</div>`);
+      }
+    }
+    return list;
+  });
+  box.innerHTML=alerts.join('');
+}
+
+function toggleFirstAidDate(){
+  const checked=document.getElementById('f-firstaid').checked;
+  document.getElementById('firstAidDateBox').style.display=checked?'block':'none';
+  if(!checked) document.getElementById('f-firstaid-date').value='';
 }
 
 // ─── List ─────────────────────────────────────────────────────────────────────
@@ -407,16 +461,26 @@ function updateStats(){
     const inact=employees.filter(e=>e.company===co&&e.inactive).length;
     // First aid per building for this company
     const buildings=params.buildings.length?params.buildings:[];
+    const threshold=params.firstAidThreshold||50;
+    const years=params.firstAidYears||3;
+    const today=new Date(); today.setHours(0,0,0,0);
     let faHtml='';
     buildings.forEach(bld=>{
       const bEmps=emps.filter(e=>e.building===bld);
       if(!bEmps.length) return;
-      const faCount=bEmps.filter(e=>e.firstAid).length;
-      const pct=Math.round(faCount/bEmps.length*100);
-      const color=pct>=20?'#065f46':pct>=10?'#92400e':'#991b1b';
+      // Valid = has firstAid AND (no date OR date not expired)
+      const validCount=bEmps.filter(e=>{
+        if(!e.firstAid) return false;
+        if(!e.firstAidDate) return true;
+        const expiry=new Date(e.firstAidDate);
+        expiry.setFullYear(expiry.getFullYear()+years);
+        return expiry>=today;
+      }).length;
+      const pct=Math.round(validCount/bEmps.length*100);
+      const color=pct>=threshold?'#065f46':pct>=(threshold/2)?'#92400e':'#991b1b';
       faHtml+=`<div style="display:flex;align-items:center;gap:4px;font-size:11px">
         <span style="color:#888">${bld}:</span>
-        <span style="font-weight:700;color:${color}">${faCount}/${bEmps.length} (${pct}%)</span>
+        <span style="font-weight:700;color:${color}">${validCount}/${bEmps.length} (${pct}%)</span>
       </div>`;
     });
     if(i>0) html+=divider;
@@ -603,6 +667,8 @@ function showNewForm(){
   document.getElementById('f-city').value='';
   document.getElementById('f-building').value='';
   document.getElementById('f-firstaid').checked=false;
+  document.getElementById('f-firstaid-date').value='';
+  document.getElementById('firstAidDateBox').style.display='none';
   document.getElementById('f-contract').value='';
   document.getElementById('f-start').value='';
   document.getElementById('f-end').value='';
@@ -630,6 +696,8 @@ function editEmployee(id){
   document.getElementById('f-city').value=emp.city||'';
   document.getElementById('f-building').value=emp.building||'';
   document.getElementById('f-firstaid').checked=emp.firstAid||false;
+  document.getElementById('f-firstaid-date').value=emp.firstAidDate||'';
+  document.getElementById('firstAidDateBox').style.display=(emp.firstAid)?'block':'none';
   document.getElementById('f-corp-email').value=emp.corpEmail||'';
   document.getElementById('f-corp-phone').value=emp.corpPhone||'';
   document.getElementById('f-ext').value=emp.ext||'';
@@ -669,6 +737,7 @@ function saveEmployee(){
     city:document.getElementById('f-city').value,
     building:document.getElementById('f-building').value,
     firstAid:document.getElementById('f-firstaid').checked,
+    firstAidDate:document.getElementById('f-firstaid-date').value,
     corpEmail:document.getElementById('f-corp-email').value.trim(),
     corpPhone:document.getElementById('f-corp-phone').value.trim(),
     ext:document.getElementById('f-ext').value.trim(),
@@ -830,6 +899,22 @@ function renderManageTrainings(){ renderManageList('manageTrainings','trainings'
 function renderManageContractTypes(){ renderManageList('manageContractTypes','contractTypes'); }
 function renderManageCompanies(){ renderManageList('manageCompanies','companies'); }
 function renderManageCities(){ renderManageList('manageCities','cities'); }
+
+function updateFaParam(key,val){
+  const n=parseInt(val);
+  if(isNaN(n)||n<1) return;
+  params[key]=n;
+  save();
+  updateStats();
+  checkAlerts();
+}
+
+function loadFaParams(){
+  const t=document.getElementById('faThresholdInput');
+  const y=document.getElementById('faYearsInput');
+  if(t) t.value=params.firstAidThreshold||50;
+  if(y) y.value=params.firstAidYears||3;
+}
 function renderManageBuildings(){ renderManageList('manageBuildings','buildings'); }
 
 function addParam(key, inputId){
@@ -891,6 +976,7 @@ function importExcel(event){
           city:row['Πόλη Εργασίας']||'',
           building:row['Κτήριο Εργασίας']||'',
           firstAid:(row['Πρώτες Βοήθειες']||'').toString().toUpperCase()==='ΝΑΙ',
+          firstAidDate:excelDate(row['Ημ/νία Πιστοποίησης ΠΒ'])||'',
           corpEmail:row['Εταιρικό Email']||'',
           corpPhone:row['Εταιρικό Τηλέφωνο']||'',
           ext:row['Εσωτερικό Τηλ']||'',
@@ -908,7 +994,7 @@ function importExcel(event){
         if(existing){
           // Check for any differences
           const fields=['name','team','role','year','mentor','manager','email','phone',
-            'company','city','building','firstAid','corpEmail','corpPhone','ext',
+            'company','city','building','firstAid','firstAidDate','corpEmail','corpPhone','ext',
             'contractType','contractStart','contractEnd','practiceOrg'];
           const hasChanges=fields.some(f=>String(incoming[f]??'')!==String(existing[f]??''));
           if(!hasChanges){skipped++;return;}
@@ -963,7 +1049,7 @@ function exportExcel(){
       'Λήξη Σύμβασης':e.contractEnd,'Κατάσταση Σύμβασης':st?st.short:'',
       'Φορέας Πρακτικής':e.practiceOrg,'Μέντορας':e.mentor,
       'Υπεύθυνος':e.manager,'Προσωπικό Email':e.email,'Τηλέφωνο Επικοινωνίας':e.phone,
-      'Πόλη Εργασίας':e.city,'Κτήριο Εργασίας':e.building,'Πρώτες Βοήθειες':e.firstAid?'ΝΑΙ':'',
+      'Πόλη Εργασίας':e.city,'Κτήριο Εργασίας':e.building,'Πρώτες Βοήθειες':e.firstAid?'ΝΑΙ':'','Ημ/νία Πιστοποίησης ΠΒ':e.firstAidDate||'',
       'Εταιρικό Email':e.corpEmail,'Εταιρικό Τηλέφωνο':e.corpPhone,'Εσωτερικό Τηλ':e.ext
     };
     (e.renewals||[]).forEach((r,i)=>{
@@ -1019,6 +1105,8 @@ function restoreJSON(event){
       if(!params.companies) params.companies = ['OTS','BlueValue'];
       if(!params.cities) params.cities = [];
       if(!params.buildings) params.buildings = [];
+      if(!params.firstAidThreshold) params.firstAidThreshold=50;
+      if(!params.firstAidYears) params.firstAidYears=3;
       save();
       populateSelects();
       populateYearFilter();
