@@ -976,7 +976,7 @@ function importExcel(event){
           city:row['Πόλη Εργασίας']||'',
           building:row['Κτήριο Εργασίας']||'',
           firstAid:(row['Πρώτες Βοήθειες']||'').toString().toUpperCase()==='ΝΑΙ',
-          firstAidDate:excelDate(row['Ημ/νία Πιστοποίησης ΠΒ'])||'',
+          firstAidDate:(()=>{ const raw=row['Ημ/νία Πιστοποίησης ΠΒ']; const converted=excelDate(raw)||''; console.log('FA raw:',raw,'type:',typeof raw,'converted:',converted); return converted; })(),
           corpEmail:row['Εταιρικό Email']||'',
           corpPhone:row['Εταιρικό Τηλέφωνο']||'',
           ext:row['Εσωτερικό Τηλ']||'',
