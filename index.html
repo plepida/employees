@@ -172,16 +172,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
     <div class="grid3">
       <div>
         <label>Τύπος Σύμβασης *</label>
-        <select id="f-contract" onchange="checkPractice()">
+        <select id="f-contract">
           <option value="">-- Επιλογή --</option>
         </select>
       </div>
       <div><label>Έναρξη *</label><input id="f-start" type="date"></div>
       <div><label>Λήξη</label><input id="f-end" type="date"></div>
     </div>
-    <div id="practiceBox" style="display:none;margin-top:4px">
-      <label>Φορέας Πρακτικής</label>
-      <input id="f-practice" type="text" placeholder="π.χ. ΟΑΕΔ, ΑΕΙ Αθήνας..." style="max-width:320px">
+    <div style="margin-top:4px">
+      <label>Φορέας Πρακτικής <span style="font-size:11px;color:#aaa;font-weight:400">(συμπλήρωσε μόνο αν αφορά πρακτική)</span></label>
+      <input id="f-practice" type="text" placeholder="π.χ. ΟΑΕΔ, ΑΕΙ Αθήνας..." style="max-width:360px">
     </div>
   </div>
 
@@ -560,10 +560,6 @@ function populateSelects(){
   if(cur3) contractSel.value=cur3;
 }
 
-function checkPractice(){
-  document.getElementById('practiceBox').style.display=
-    document.getElementById('f-contract').value==='Πρακτική Άσκηση'?'block':'none';
-}
 
 function addRenewal(r={}){
   const id='ren_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
@@ -644,7 +640,6 @@ function editEmployee(id){
   renewalCount=0;
   document.getElementById('renewalList').innerHTML='';
   (emp.renewals||[]).forEach(r=>addRenewal(r));
-  checkPractice();
   populateSelects();
   document.getElementById('f-team').value=emp.team||'';
   document.getElementById('f-role').value=emp.role||'';
