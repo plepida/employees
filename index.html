@@ -976,7 +976,7 @@ function importExcel(event){
           city:row['Πόλη Εργασίας']||'',
           building:row['Κτήριο Εργασίας']||'',
           firstAid:(row['Πρώτες Βοήθειες']||'').toString().toUpperCase()==='ΝΑΙ',
-          firstAidDate:(()=>{ const raw=row['Ημ/νία Πιστοποίησης ΠΒ']; const converted=excelDate(raw)||''; console.log('FA raw:',raw,'type:',typeof raw,'converted:',converted); return converted; })(),
+          firstAidDate:excelDate(row['Ημ/νία Πιστοποίησης ΠΒ'])||'',
           corpEmail:row['Εταιρικό Email']||'',
           corpPhone:row['Εταιρικό Τηλέφωνο']||'',
           ext:row['Εσωτερικό Τηλ']||'',
@@ -1023,15 +1023,27 @@ function excelDate(val){
     const y=val.getFullYear(), m=String(val.getMonth()+1).padStart(2,'0'), d=String(val.getDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
-  // If already a string like DD/MM/YYYY or YYYY-MM-DD or D/M/YYYY
+  // If already a string — handle all formats SheetJS might return
   if(typeof val==='string'){
     val=val.trim();
     if(!val) return '';
+    // YYYY-MM-DD
     if(/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-    // DD/MM/YYYY or D/M/YYYY
+    // DD/MM/YYYY or D/M/YYYY (Greek format)
     if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)){
       const parts=val.split('/');
       const d=parts[0].padStart(2,'0'), m=parts[1].padStart(2,'0'), y=parts[2];
+      return `${y}-${m}-${d}`;
+    }
+    // M/DD/YY or MM/DD/YY (US short year — SheetJS with raw:false, dateNF)
+    // e.g. "2/26/26" → interpret as DD=26, MM=02, YY=26 → 2026
+    if(/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(val)){
+      const parts=val.split('/');
+      // SheetJS M/DD/YY: parts[0]=month, parts[1]=day, parts[2]=2-digit year
+      const m=parts[0].padStart(2,'0');
+      const d=parts[1].padStart(2,'0');
+      const yy=parseInt(parts[2]);
+      const y=(yy>=50?1900:2000)+yy; // 00-49 → 2000s, 50-99 → 1900s
       return `${y}-${m}-${d}`;
     }
     return '';
