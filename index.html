@@ -157,6 +157,14 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
       <div><label>Εταιρικό Τηλέφωνο</label><input id="f-corp-phone" type="tel" placeholder="21xxxxxxxx"></div>
       <div><label>Εσωτερικό Τηλ.</label><input id="f-ext" type="text" placeholder="π.χ. 101"></div>
     </div>
+    <div class="grid3" style="margin-top:0">
+      <div><label>Πόλη Εργασίας</label><select id="f-city"><option value="">-- Επιλογή --</option></select></div>
+      <div><label>Κτήριο Εργασίας</label><select id="f-building"><option value="">-- Επιλογή --</option></select></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:22px">
+        <input type="checkbox" id="f-firstaid" style="width:auto;accent-color:#065f46;width:16px;height:16px;cursor:pointer">
+        <label for="f-firstaid" style="margin:0;font-size:13px;color:#1a1a1a;cursor:pointer;font-weight:500">Πρώτες Βοήθειες ✚</label>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -280,6 +288,25 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
 
   </div>
 
+  <div class="grid2" style="gap:16px">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">🏙 Πόλεις</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newCity" type="text" placeholder="Νέα πόλη...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('cities','newCity')">＋</button>
+      </div>
+      <div id="manageCities"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">🏛 Κτήρια</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newBuilding" type="text" placeholder="Νέο κτήριο...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('buildings','newBuilding')">＋</button>
+      </div>
+      <div id="manageBuildings"></div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title" style="margin-bottom:10px">🎓 Εκπαιδεύσεις</div>
     <p style="font-size:13px;color:#888;margin-bottom:12px">Οι αλλαγές εφαρμόζονται αυτόματα σε όλους τους εργαζομένους.</p>
@@ -304,7 +331,9 @@ let params = JSON.parse(localStorage.getItem('emp_v2_params')||'null') || {
   teams:[],
   roles:[],
   contractTypes:['Αορίστου Χρόνου','Ορισμένου Χρόνου','Πρακτική Άσκηση','Freelance','Μερικής Απασχόλησης'],
-  companies:['OTS','BlueValue']
+  companies:['OTS','BlueValue'],
+  cities:[],
+  buildings:[]
 };
 let editingId = null;
 let renewalCount = 0;
@@ -322,7 +351,7 @@ function switchTab(id, idx){
   document.querySelectorAll('.tab')[idx].classList.add('active');
   if(id==='list') renderList();
   if(id==='trainings-tab'){ renderTrainEmpSelect(); renderTrainings(); populateTrainFilterSelect(); }
-  if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageTrainings(); }
+  if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageCities(); renderManageBuildings(); renderManageTrainings(); }
   checkAlerts();
 }
 
@@ -373,11 +402,25 @@ function updateStats(){
 
   // Per company blocks
   companies.forEach((co,i)=>{
-    const emps=employees.filter(e=>e.company===co);
-    const act=emps.filter(e=>!e.inactive).length;
-    const inact=emps.filter(e=>e.inactive).length;
+    const emps=employees.filter(e=>e.company===co&&!e.inactive);
+    const act=emps.length;
+    const inact=employees.filter(e=>e.company===co&&e.inactive).length;
+    // First aid per building for this company
+    const buildings=params.buildings.length?params.buildings:[];
+    let faHtml='';
+    buildings.forEach(bld=>{
+      const bEmps=emps.filter(e=>e.building===bld);
+      if(!bEmps.length) return;
+      const faCount=bEmps.filter(e=>e.firstAid).length;
+      const pct=Math.round(faCount/bEmps.length*100);
+      const color=pct>=20?'#065f46':pct>=10?'#92400e':'#991b1b';
+      faHtml+=`<div style="display:flex;align-items:center;gap:4px;font-size:11px">
+        <span style="color:#888">${bld}:</span>
+        <span style="font-weight:700;color:${color}">${faCount}/${bEmps.length} (${pct}%)</span>
+      </div>`;
+    });
     if(i>0) html+=divider;
-    html+=`<div style="display:flex;align-items:center;gap:16px;padding:0 20px">
+    html+=`<div style="display:flex;align-items:center;gap:12px;padding:0 16px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:700;color:#1a1a1a;min-width:70px">${co}</span>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Ενεργοί</span>
@@ -387,6 +430,10 @@ function updateStats(){
         <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Αποχώρ.</span>
         <span style="font-size:20px;font-weight:700;color:#991b1b">${inact}</span>
       </div>
+      ${faHtml?`<div style="border-left:1px solid #e0dfd8;padding-left:12px;display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.4px">✚ Πρώτες Βοήθειες / Κτήριο</span>
+        ${faHtml}
+      </div>`:''}
     </div>`;
   });
 
@@ -504,6 +551,10 @@ function populateSelects(){
     coFilter.innerHTML='<option value="">Όλες οι εταιρείες</option>'+params.companies.map(c=>`<option>${c}</option>`).join('');
     if(curF) coFilter.value=curF;
   }
+  const citySel=document.getElementById('f-city');
+  if(citySel){ const curC=citySel.value; citySel.innerHTML='<option value="">-- Επιλογή --</option>'+params.cities.map(c=>`<option>${c}</option>`).join(''); if(curC) citySel.value=curC; }
+  const bldSel=document.getElementById('f-building');
+  if(bldSel){ const curB=bldSel.value; bldSel.innerHTML='<option value="">-- Επιλογή --</option>'+params.buildings.map(b=>`<option>${b}</option>`).join(''); if(curB) bldSel.value=curB; }
   if(cur1) teamSel.value=cur1;
   if(cur2) roleSel.value=cur2;
   if(cur3) contractSel.value=cur3;
@@ -553,6 +604,9 @@ function showNewForm(){
   editingId=null; renewalCount=0;
   ['f-name','f-mentor','f-manager','f-email','f-phone','f-practice','f-year','f-corp-email','f-corp-phone','f-ext'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-company').value='';
+  document.getElementById('f-city').value='';
+  document.getElementById('f-building').value='';
+  document.getElementById('f-firstaid').checked=false;
   document.getElementById('f-contract').value='';
   document.getElementById('f-start').value='';
   document.getElementById('f-end').value='';
@@ -577,6 +631,9 @@ function editEmployee(id){
   document.getElementById('f-phone').value=emp.phone||'';
   document.getElementById('f-year').value=emp.year||'';
   document.getElementById('f-company').value=emp.company||'';
+  document.getElementById('f-city').value=emp.city||'';
+  document.getElementById('f-building').value=emp.building||'';
+  document.getElementById('f-firstaid').checked=emp.firstAid||false;
   document.getElementById('f-corp-email').value=emp.corpEmail||'';
   document.getElementById('f-corp-phone').value=emp.corpPhone||'';
   document.getElementById('f-ext').value=emp.ext||'';
@@ -614,6 +671,9 @@ function saveEmployee(){
     phone:document.getElementById('f-phone').value.trim(),
     year:document.getElementById('f-year').value.trim(),
     company:document.getElementById('f-company').value,
+    city:document.getElementById('f-city').value,
+    building:document.getElementById('f-building').value,
+    firstAid:document.getElementById('f-firstaid').checked,
     corpEmail:document.getElementById('f-corp-email').value.trim(),
     corpPhone:document.getElementById('f-corp-phone').value.trim(),
     ext:document.getElementById('f-ext').value.trim(),
@@ -774,6 +834,8 @@ function renderManageRoles(){ renderManageList('manageRoles','roles'); }
 function renderManageTrainings(){ renderManageList('manageTrainings','trainings'); }
 function renderManageContractTypes(){ renderManageList('manageContractTypes','contractTypes'); }
 function renderManageCompanies(){ renderManageList('manageCompanies','companies'); }
+function renderManageCities(){ renderManageList('manageCities','cities'); }
+function renderManageBuildings(){ renderManageList('manageBuildings','buildings'); }
 
 function addParam(key, inputId){
   const inp=document.getElementById(inputId);
@@ -786,6 +848,8 @@ function addParam(key, inputId){
   if(key==='roles') renderManageRoles();
   if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
   if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
+  if(key==='cities'){ renderManageCities(); populateSelects(); }
+  if(key==='buildings'){ renderManageBuildings(); populateSelects(); updateStats(); }
   if(key==='trainings') renderManageTrainings();
 }
 
@@ -797,6 +861,8 @@ function removeParam(key,i,containerId){
   if(key==='roles') renderManageRoles();
   if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
   if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
+  if(key==='cities'){ renderManageCities(); populateSelects(); }
+  if(key==='buildings'){ renderManageBuildings(); populateSelects(); updateStats(); }
   if(key==='trainings') renderManageTrainings();
 }
 
@@ -829,6 +895,9 @@ function importExcel(event){
           email:row['Προσωπικό Email']||'',
           phone:row['Τηλέφωνο Επικοινωνίας']||'',
           company:row['Εταιρεία']||'',
+          city:row['Πόλη Εργασίας']||'',
+          building:row['Κτήριο Εργασίας']||'',
+          firstAid:(row['Πρώτες Βοήθειες']||'').toString().toUpperCase()==='ΝΑΙ',
           corpEmail:row['Εταιρικό Email']||'',
           corpPhone:row['Εταιρικό Τηλέφωνο']||'',
           ext:row['Εσωτερικό Τηλ']||'',
@@ -884,6 +953,7 @@ function exportExcel(){
       'Λήξη Σύμβασης':e.contractEnd,'Κατάσταση Σύμβασης':st?st.short:'',
       'Φορέας Πρακτικής':e.practiceOrg,'Μέντορας':e.mentor,
       'Υπεύθυνος':e.manager,'Προσωπικό Email':e.email,'Τηλέφωνο Επικοινωνίας':e.phone,
+      'Πόλη Εργασίας':e.city,'Κτήριο Εργασίας':e.building,'Πρώτες Βοήθειες':e.firstAid?'ΝΑΙ':'',
       'Εταιρικό Email':e.corpEmail,'Εταιρικό Τηλέφωνο':e.corpPhone,'Εσωτερικό Τηλ':e.ext
     };
     (e.renewals||[]).forEach((r,i)=>{
@@ -937,6 +1007,8 @@ function restoreJSON(event){
       params = data.params;
       // ensure new keys exist for older backups
       if(!params.companies) params.companies = ['OTS','BlueValue'];
+      if(!params.cities) params.cities = [];
+      if(!params.buildings) params.buildings = [];
       save();
       populateSelects();
       populateYearFilter();
