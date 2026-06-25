@@ -956,7 +956,7 @@ function importExcel(event){
     try{
       const wb=XLSX.read(e.target.result,{type:'binary'});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false,dateNF:'dd/mm/yyyy'});
       let added=0, updated=0, skipped=0;
       rows.forEach(row=>{
         const name=(row['Ονοματεπώνυμο']||'').trim();
@@ -1017,13 +1017,22 @@ function importExcel(event){
 }
 
 function excelDate(val){
-  if(!val) return '';
-  // If already a string like DD/MM/YYYY or YYYY-MM-DD
+  if(!val && val!==0) return '';
+  // If it's a Date object (SheetJS sometimes returns these)
+  if(val instanceof Date){
+    const y=val.getFullYear(), m=String(val.getMonth()+1).padStart(2,'0'), d=String(val.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  // If already a string like DD/MM/YYYY or YYYY-MM-DD or D/M/YYYY
   if(typeof val==='string'){
     val=val.trim();
+    if(!val) return '';
     if(/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-    if(/^\d{2}\/\d{2}\/\d{4}$/.test(val)){
-      const [d,m,y]=val.split('/'); return `${y}-${m}-${d}`;
+    // DD/MM/YYYY or D/M/YYYY
+    if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)){
+      const parts=val.split('/');
+      const d=parts[0].padStart(2,'0'), m=parts[1].padStart(2,'0'), y=parts[2];
+      return `${y}-${m}-${d}`;
     }
     return '';
   }
