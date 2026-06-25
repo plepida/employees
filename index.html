@@ -872,15 +872,13 @@ function importExcel(event){
       const wb=XLSX.read(e.target.result,{type:'binary'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
-      let added=0, skipped=0;
+      let added=0, updated=0, skipped=0;
       rows.forEach(row=>{
         const name=(row['Ονοματεπώνυμο']||'').trim();
         if(!name){skipped++;return;}
         const corpEmailVal=(row['Εταιρικό Email']||'').trim().toLowerCase();
-        if(corpEmailVal && employees.find(e=>(e.corpEmail||'').toLowerCase()===corpEmailVal)){skipped++;return;}
-        if(!corpEmailVal && employees.find(e=>e.name.toLowerCase()===name.toLowerCase())){skipped++;return;}
-        employees.push({
-          id:uid(),
+
+        const incoming={
           name,
           team:row['Ομάδα']||'',
           role:row['Θέση']||'',
@@ -900,15 +898,35 @@ function importExcel(event){
           contractStart:excelDate(row['Έναρξη Σύμβασης']),
           contractEnd:excelDate(row['Λήξη Σύμβασης']),
           practiceOrg:row['Φορέας Πρακτικής']||'',
-          inactive:false,
-          renewals:[],
-          trainings:{}
-        });
-        added++;
+        };
+
+        // Find existing by corpEmail first, then by name
+        let existing=null;
+        if(corpEmailVal) existing=employees.find(e=>(e.corpEmail||'').toLowerCase()===corpEmailVal);
+        if(!existing) existing=employees.find(e=>e.name.toLowerCase()===name.toLowerCase());
+
+        if(existing){
+          // Check for any differences
+          const fields=['name','team','role','year','mentor','manager','email','phone',
+            'company','city','building','firstAid','corpEmail','corpPhone','ext',
+            'contractType','contractStart','contractEnd','practiceOrg'];
+          const hasChanges=fields.some(f=>String(incoming[f]??'')!==String(existing[f]??''));
+          if(!hasChanges){skipped++;return;}
+          // Update only importable fields — preserve trainings, renewals, inactive, id
+          fields.forEach(f=>{ existing[f]=incoming[f]; });
+          updated++;
+        } else {
+          employees.push({id:uid(),...incoming,inactive:false,renewals:[],trainings:{}});
+          added++;
+        }
       });
-      save(); populateYearFilter(); renderList(); checkAlerts();
-      alert(`Εισαγωγή ολοκληρώθηκε.\nΠροστέθηκαν: ${added}\nΠαραλείφθηκαν (υπάρχουν ήδη ή χωρίς όνομα): ${skipped}`);
+      save(); populateYearFilter(); updateStats(); renderList(); checkAlerts();
+      alert('Εισαγωγή ολοκληρώθηκε!
+✅ Νέοι: '+added+'
+🔄 Ενημερώθηκαν: '+updated+'
+⏭ Χωρίς αλλαγές: '+skipped);
     }catch(err){
+      console.error(err);
       alert('Σφάλμα κατά την εισαγωγή. Βεβαιώσου ότι το αρχείο έχει τη σωστή γραμμογράφηση.');
     }
   };
