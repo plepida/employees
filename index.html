@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Παρακολούθηση Εργαζομένων</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;background:#f5f5f3;color:#1a1a1a;min-height:100vh}
+.topbar{background:#fff;border-bottom:1px solid #e0dfd8;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+.topbar h1{font-size:16px;font-weight:600;color:#1a1a1a}
+.container{max-width:960px;margin:0 auto;padding:24px}
+.tabs{display:flex;gap:2px;background:#eeedea;border-radius:10px;padding:4px;margin-bottom:24px}
+.tab{flex:1;padding:8px 12px;border:none;background:none;border-radius:8px;font-size:13px;cursor:pointer;color:#666;font-family:inherit;transition:all .15s}
+.tab.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.panel{display:none}.panel.active{display:block}
+label{display:block;font-size:12px;color:#666;margin-bottom:4px;margin-top:14px;font-weight:500}
+input[type=text],input[type=date],input[type=email],input[type=tel],select,textarea{
+  width:100%;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;
+  font-family:inherit;color:#1a1a1a;background:#fff;transition:border .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 16px}
+.card{background:#fff;border-radius:12px;border:1px solid #e0dfd8;padding:18px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:600;color:#444;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;display:inline-block}
+.badge-info{background:#e8f0fe;color:#1a56db}
+.badge-warn{background:#fef3c7;color:#92400e}
+.badge-danger{background:#fee2e2;color:#991b1b}
+.badge-success{background:#d1fae5;color:#065f46}
+.badge-gray{background:#f1f0ec;color:#555}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #ddd;background:#fff;color:#1a1a1a;font-family:inherit;font-weight:500;transition:all .15s}
+.btn:hover{background:#f5f5f3;border-color:#bbb}
+.btn-primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn-primary:hover{background:#333}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-danger{color:#991b1b;border-color:#fca5a5}
+.btn-danger:hover{background:#fee2e2}
+.btn-success{background:#065f46;color:#fff;border-color:#065f46}
+.btn-success:hover{background:#047857}
+.alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:8px;display:flex;align-items:flex-start;gap:8px}
+.alert-warn{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+.alert-danger{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.emp-card{background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+.emp-card:hover{border-color:#999}
+.emp-card-inactive{opacity:0.55;background:#f9f9f7}
+.emp-name{font-weight:600;font-size:15px}
+.emp-meta{font-size:12px;color:#888;margin-top:2px}
+.emp-badges{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.training-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:10px}
+.training-item{background:#fff;border:1px solid #e0dfd8;border-radius:8px;padding:10px 12px}
+.training-item label{margin:0;font-size:13px;color:#1a1a1a;cursor:pointer;font-weight:400}
+.training-item input[type=checkbox]{width:auto;cursor:pointer;accent-color:#1a1a1a}
+.t-date{font-size:11px;color:#888;margin-top:3px}
+.manage-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f0efeb}
+.manage-item:last-child{border-bottom:none}
+.del-btn{background:none;border:none;cursor:pointer;color:#bbb;font-size:18px;line-height:1;padding:0 4px;font-family:inherit}
+.del-btn:hover{color:#991b1b}
+.renewal-block{background:#f9f9f7;border:1px solid #e8e7e2;border-radius:10px;padding:14px;margin-top:10px}
+.divider{border:none;border-top:1px solid #f0efeb;margin:16px 0}
+.search-bar{padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;width:100%;max-width:280px;margin-bottom:16px}
+.search-bar:focus{outline:none;border-color:#888}
+.empty-state{text-align:center;padding:48px 24px;color:#999}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.progress-bar{height:6px;background:#f0efeb;border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:#065f46;border-radius:3px;transition:width .3s}
+.tooltip-badge{cursor:default}
+.section-actions{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>👥 Παρακολούθηση Εργαζομένων</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn btn-sm" onclick="exportExcel()" title="Εξαγωγή σε Excel">⬇ Excel</button>
+    <button class="btn btn-sm" onclick="backupJSON()" title="Αποθήκευση όλων των δεδομένων σε αρχείο JSON">💾 Backup</button>
+    <label class="btn btn-sm" style="cursor:pointer" title="Επαναφορά δεδομένων από αρχείο JSON">📂 Restore<input type="file" accept=".json" style="display:none" onchange="restoreJSON(event)"></label>
+    <button class="btn btn-sm btn-primary" onclick="showNewForm()">＋ Νέος Εργαζόμενος</button>
+  </div>
+</div>
+
+<div id="statsBar" style="background:#fff;border-bottom:1px solid #e0dfd8;padding:10px 24px;display:flex;gap:0;justify-content:center;flex-wrap:wrap"></div>
+
+<div class="container">
+
+<div id="alertsBox" style="margin-bottom:12px"></div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('list',0)">Λίστα</button>
+  <button class="tab" onclick="switchTab('form',1)">Φόρμα</button>
+  <button class="tab" onclick="switchTab('trainings-tab',2)">Εκπαιδεύσεις</button>
+  <button class="tab" onclick="switchTab('manage',3)">⚙ Παράμετροι</button>
+</div>
+
+<!-- LIST -->
+<div id="list" class="panel active">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+    <input id="searchQ" class="search-bar" type="text" placeholder="🔍 Αναζήτηση..." oninput="renderList()" style="margin-bottom:0;flex:1;min-width:180px;max-width:340px">
+    <select id="filterYear" onchange="renderList()" style="max-width:140px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+      <option value="">Όλα τα έτη</option>
+    </select>
+    <select id="filterStatus" onchange="renderList()" style="max-width:150px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+      <option value="active">Ενεργοί</option>
+      <option value="all">Όλοι</option>
+      <option value="inactive">Αποχωρήσαντες</option>
+    </select>
+    <select id="filterCompany" onchange="renderList()" style="max-width:150px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="">Όλες οι εταιρείες</option></select>
+    <button class="btn btn-sm" onclick="clearFilters()">✕ Καθαρισμός</button>
+    <label class="btn btn-sm" style="cursor:pointer" title="Εισαγωγή από Excel">⬆ Import Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(event)"></label>
+    <span id="listCount" style="font-size:13px;color:#999;margin-left:auto"></span>
+  </div>
+  <div id="empList"></div>
+  <div id="noEmp" class="empty-state" style="display:none">
+    <div class="icon">👤</div>
+    <div>Δεν υπάρχουν εργαζόμενοι ακόμα.</div>
+    <div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="showNewForm()">＋ Πρόσθεσε τον πρώτο</button></div>
+  </div>
+</div>
+
+<!-- FORM -->
+<div id="form" class="panel">
+
+  <div class="card">
+    <div class="card-title">👤 Βασικά Στοιχεία</div>
+    <div class="grid2">
+      <div><label>Ονοματεπώνυμο *</label><input id="f-name" type="text" placeholder="Όνομα Επώνυμο"></div>
+      <div>
+        <label>Ομάδα</label>
+        <select id="f-team">
+          <option value="">-- Επιλογή --</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <label>Θέση Εργασίας</label>
+        <select id="f-role">
+          <option value="">-- Επιλογή --</option>
+        </select>
+      </div>
+      <div><label>Μέντορας</label><input id="f-mentor" type="text" placeholder="Όνομα Μέντορα"></div>
+    </div>
+    <div class="grid2">
+      <div><label>Υπεύθυνος</label><input id="f-manager" type="text" placeholder="Όνομα Υπεύθυνου"></div>
+      <div><label>Προσωπικό Email</label><input id="f-email" type="email" placeholder="email@example.com"></div>
+    </div>
+    <div class="grid2" style="margin-top:0">
+      <div><label>Τηλέφωνο Επικοινωνίας</label><input id="f-phone" type="tel" placeholder="69xxxxxxxx"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px"><div><label>Έτος</label><input id="f-year" type="number" placeholder="π.χ. 2024" min="2000" max="2100"></div><div><label>Εταιρεία</label><select id="f-company"><option value="">-- Επιλογή --</option></select></div></div>
+    </div>
+    <hr style="border:none;border-top:1px solid #f0efeb;margin:14px 0 0">
+    <div style="font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-top:10px">Εταιρικά Στοιχεία</div>
+    <div class="grid3">
+      <div><label>Εταιρικό Email</label><input id="f-corp-email" type="email" placeholder="onoma@company.com"></div>
+      <div><label>Εταιρικό Τηλέφωνο</label><input id="f-corp-phone" type="tel" placeholder="21xxxxxxxx"></div>
+      <div><label>Εσωτερικό Τηλ.</label><input id="f-ext" type="text" placeholder="π.χ. 101"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📄 Αρχική Σύμβαση</div>
+    <div class="grid3">
+      <div>
+        <label>Τύπος Σύμβασης *</label>
+        <select id="f-contract" onchange="checkPractice()">
+          <option value="">-- Επιλογή --</option>
+        </select>
+      </div>
+      <div><label>Έναρξη *</label><input id="f-start" type="date"></div>
+      <div><label>Λήξη</label><input id="f-end" type="date"></div>
+    </div>
+    <div id="practiceBox" style="display:none;margin-top:4px">
+      <label>Φορέας Πρακτικής</label>
+      <input id="f-practice" type="text" placeholder="π.χ. ΟΑΕΔ, ΑΕΙ Αθήνας..." style="max-width:320px">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-actions">
+      <div class="card-title">🔄 Ανανεώσεις Σύμβασης</div>
+      <button class="btn btn-sm" onclick="addRenewal()">＋ Προσθήκη Ανανέωσης</button>
+    </div>
+    <div id="renewalList"></div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="saveEmployee()">✓ Αποθήκευση</button>
+    <button class="btn" onclick="cancelForm()">Άκυρο</button>
+    <button class="btn" id="inactiveBtn" onclick="toggleInactive()" style="display:none;margin-left:auto">⏹ Αποχώρηση</button>
+    <button class="btn btn-danger" id="deleteBtn" onclick="deleteEmployee()" style="display:none">🗑 Διαγραφή</button>
+  </div>
+</div>
+
+<!-- TRAININGS -->
+<div id="trainings-tab" class="panel">
+  <!-- Mode tabs -->
+  <div style="display:flex;gap:4px;background:#eeedea;border-radius:10px;padding:4px;margin-bottom:16px;max-width:480px">
+    <button id="trainModeEmp" class="tab active" style="flex:1" onclick="switchTrainMode('emp')">📋 Ανά Εργαζόμενο</button>
+    <button id="trainModeFilter" class="tab" style="flex:1" onclick="switchTrainMode('filter')">🔍 Ανά Εκπαίδευση</button>
+  </div>
+
+  <!-- Mode: per employee -->
+  <div id="trainPanelEmp">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <select id="trainEmpSelect" onchange="renderTrainings()" style="max-width:300px">
+        <option value="">-- Επιλογή Εργαζομένου --</option>
+      </select>
+      <span id="trainProgress" style="font-size:13px;color:#888"></span>
+    </div>
+    <div id="trainingsContent">
+      <div class="empty-state"><div class="icon">🎓</div><div>Επίλεξε εργαζόμενο για καταχώρηση εκπαιδεύσεων.</div></div>
+    </div>
+  </div>
+
+  <!-- Mode: per training (who hasn't done it) -->
+  <div id="trainPanelFilter" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <select id="trainFilterSelect" onchange="renderTrainingFilter()" style="max-width:300px">
+        <option value="">-- Επιλογή Εκπαίδευσης --</option>
+      </select>
+      <select id="trainFilterStatus" onchange="renderTrainingFilter()" style="max-width:180px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit">
+        <option value="missing">Δεν την έχουν κάνει</option>
+        <option value="done">Την έχουν κάνει</option>
+        <option value="all">Όλοι</option>
+      </select>
+      <span id="trainFilterCount" style="font-size:13px;color:#888"></span>
+    </div>
+    <div id="trainFilterContent">
+      <div class="empty-state"><div class="icon">🔍</div><div>Επίλεξε εκπαίδευση για να δεις ποιοι την έχουν κάνει.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE -->
+<div id="manage" class="panel">
+
+  <div class="grid2" style="gap:16px">
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">🏢 Ομάδες</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newTeam" type="text" placeholder="Νέα ομάδα...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('teams','newTeam')">＋</button>
+      </div>
+      <div id="manageTeams"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">💼 Θέσεις Εργασίας</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newRole" type="text" placeholder="Νέα θέση...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('roles','newRole')">＋</button>
+      </div>
+      <div id="manageRoles"></div>
+    </div>
+
+  </div>
+
+  <div class="grid2" style="gap:16px">
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">📄 Τύποι Σύμβασης</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newContractType" type="text" placeholder="Νέος τύπος σύμβασης...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('contractTypes','newContractType')">＋</button>
+      </div>
+      <div id="manageContractTypes"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">🏛 Εταιρείες</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input id="newCompany" type="text" placeholder="Νέα εταιρεία...">
+        <button class="btn btn-sm btn-primary" onclick="addParam('companies','newCompany')">＋</button>
+      </div>
+      <div id="manageCompanies"></div>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:10px">🎓 Εκπαιδεύσεις</div>
+    <p style="font-size:13px;color:#888;margin-bottom:12px">Οι αλλαγές εφαρμόζονται αυτόματα σε όλους τους εργαζομένους.</p>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input id="newTraining" type="text" placeholder="Τίτλος νέας εκπαίδευσης...">
+      <button class="btn btn-sm btn-primary" onclick="addParam('trainings','newTraining')">＋</button>
+    </div>
+    <div id="manageTrainings" style="columns:2;gap:16px"></div>
+  </div>
+
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let employees = JSON.parse(localStorage.getItem('emp_v2_employees')||'[]');
+let params = JSON.parse(localStorage.getItem('emp_v2_params')||'null') || {
+  trainings:['Onboarding Intro','Onboarding Tips','Ξενάγηση','Κανόνες Επικοινωνίας',
+    'Open1|HR','Παροχές','Εσωτερικός Κανονισμός','Μορφές Επαγγελματικής Επικοινωνίας',
+    'Φωτογράφιση','BizDev','PS','PT','CEO','Lego','Scrum'],
+  teams:[],
+  roles:[],
+  contractTypes:['Αορίστου Χρόνου','Ορισμένου Χρόνου','Πρακτική Άσκηση','Freelance','Μερικής Απασχόλησης'],
+  companies:['OTS','BlueValue']
+};
+let editingId = null;
+let renewalCount = 0;
+
+function save(){
+  localStorage.setItem('emp_v2_employees', JSON.stringify(employees));
+  localStorage.setItem('emp_v2_params', JSON.stringify(params));
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(id, idx){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  if(id==='list') renderList();
+  if(id==='trainings-tab'){ renderTrainEmpSelect(); renderTrainings(); populateTrainFilterSelect(); }
+  if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageTrainings(); }
+  checkAlerts();
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+function formatDate(s){
+  if(!s) return '—';
+  const [y,m,d]=s.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const d=new Date(dateStr), now=new Date();
+  now.setHours(0,0,0,0);
+  return Math.floor((d-now)/86400000);
+}
+
+function contractStatus(emp){
+  const end = emp.renewals?.length ? emp.renewals[emp.renewals.length-1].end : emp.contractEnd;
+  if(!end) return null;
+  const d=daysUntil(end);
+  if(d<0) return {type:'danger',label:'Η σύμβαση έχει λήξει',short:'Έληξε',date:end};
+  if(d<=30) return {type:'warn',label:`Λήγει σε ${d} μέρ.`,short:`Λήγει σε ${d} μέρ.`,date:end};
+  return {type:'ok',label:`Ενεργή έως ${formatDate(end)}`,short:'Ενεργή',date:end};
+}
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+function checkAlerts(){
+  const box=document.getElementById('alertsBox');
+  const html=employees.flatMap(emp=>{
+    const st=contractStatus(emp);
+    if(!st||st.type==='ok') return [];
+    const cls=st.type==='danger'?'alert-danger':'alert-warn';
+    const icon=st.type==='danger'?'🔴':'🟡';
+    return [`<div class="alert ${cls}">${icon} <strong>${emp.name}</strong>: ${st.label} — λήξη ${formatDate(st.date)}</div>`];
+  }).join('');
+  box.innerHTML=html;
+}
+
+// ─── List ─────────────────────────────────────────────────────────────────────
+function updateStats(){
+  const companies=params.companies.length?params.companies:[];
+  const bar=document.getElementById('statsBar');
+  let html='';
+  const divider='<div style="width:1px;background:#e0dfd8;margin:0 4px"></div>';
+
+  // Per company blocks
+  companies.forEach((co,i)=>{
+    const emps=employees.filter(e=>e.company===co);
+    const act=emps.filter(e=>!e.inactive).length;
+    const inact=emps.filter(e=>e.inactive).length;
+    if(i>0) html+=divider;
+    html+=`<div style="display:flex;align-items:center;gap:16px;padding:0 20px">
+      <span style="font-size:12px;font-weight:700;color:#1a1a1a;min-width:70px">${co}</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Ενεργοί</span>
+        <span style="font-size:20px;font-weight:700;color:#065f46">${act}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Αποχώρ.</span>
+        <span style="font-size:20px;font-weight:700;color:#991b1b">${inact}</span>
+      </div>
+    </div>`;
+  });
+
+  // Totals
+  const totalActive=employees.filter(e=>!e.inactive).length;
+  const totalInactive=employees.filter(e=>e.inactive).length;
+  if(companies.length) html+=divider;
+  html+=`<div style="display:flex;align-items:center;gap:16px;padding:0 20px;background:#f9f9f7;border-radius:8px">
+    <span style="font-size:12px;font-weight:700;color:#444;min-width:70px">Σύνολο</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Ενεργοί</span>
+      <span style="font-size:20px;font-weight:700;color:#065f46">${totalActive}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Αποχώρ.</span>
+      <span style="font-size:20px;font-weight:700;color:#991b1b">${totalInactive}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;font-weight:600;color:#999;text-transform:uppercase">Σύνολο</span>
+      <span style="font-size:20px;font-weight:700;color:#1a1a1a">${employees.length}</span>
+    </div>
+  </div>`;
+  bar.innerHTML=html;
+}
+
+function populateYearFilter(){
+  const sel=document.getElementById('filterYear');
+  const cur=sel.value;
+  const years=[...new Set(employees.map(e=>e.year).filter(Boolean))].sort((a,b)=>b-a);
+  sel.innerHTML='<option value="">Όλα τα έτη</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+function clearFilters(){
+  document.getElementById('searchQ').value='';
+  document.getElementById('filterYear').value='';
+  document.getElementById('filterStatus').value='active';
+  document.getElementById('filterCompany').value='';
+  renderList();
+}
+
+function renderList(){
+  const q=(document.getElementById('searchQ')?.value||'').toLowerCase();
+  const yr=document.getElementById('filterYear')?.value||'';
+  const list=document.getElementById('empList');
+  const noEmp=document.getElementById('noEmp');
+  const status=document.getElementById('filterStatus')?.value||'active';
+  const co=document.getElementById('filterCompany')?.value||'';
+  const filtered=employees.filter(e=>{
+    const matchQ=!q||e.name.toLowerCase().includes(q)||
+      (e.team||'').toLowerCase().includes(q)||
+      (e.role||'').toLowerCase().includes(q);
+    const matchY=!yr||(e.year||'')==yr;
+    const matchS=status==='all'||(status==='active'&&!e.inactive)||(status==='inactive'&&e.inactive);
+    const matchCo=!co||(e.company||'')==co;
+    return matchQ&&matchY&&matchS&&matchCo;
+  });
+  if(employees.length===0){ list.innerHTML=''; noEmp.style.display='block'; document.getElementById('listCount').textContent=''; return; }
+  noEmp.style.display='none';
+  document.getElementById('listCount').textContent=filtered.length===employees.length?`${employees.length} εργαζόμενοι`:`${filtered.length} από ${employees.length}`;
+  const total=params.trainings.length;
+  list.innerHTML=filtered.map(emp=>{
+    const st=contractStatus(emp);
+    let badge='';
+    if(st){
+      if(st.type==='danger') badge=`<span class="badge badge-danger">Έληξε</span>`;
+      else if(st.type==='warn') badge=`<span class="badge badge-warn">${st.short}</span>`;
+      else badge=`<span class="badge badge-success">Ενεργή</span>`;
+    }
+    const done=Object.values(emp.trainings||{}).filter(t=>t.done).length;
+    const pct=total?Math.round(done/total*100):0;
+    const inactiveCls=emp.inactive?' emp-card-inactive':'';
+    return `<div class="emp-card${inactiveCls}" onclick="editEmployee('${emp.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <div class="emp-name">${emp.name}</div>
+            ${emp.inactive?`<span class="badge badge-gray">Αποχώρησε</span>`:''}
+          </div>
+          <div class="emp-meta">${[emp.company,emp.role,emp.team,emp.year?'Έτος '+emp.year:''].filter(Boolean).join(' · ')}</div>
+        </div>
+        <div style="display:flex;gap:6px">${badge}</div>
+      </div>
+      <div class="emp-badges">
+        ${emp.contractType?`<span class="badge badge-info">${emp.contractType}</span>`:''}
+        ${emp.contractStart?`<span style="font-size:11px;color:#999">από ${formatDate(emp.contractStart)}</span>`:''}
+        <span style="font-size:11px;color:#999;margin-left:auto">🎓 ${done}/${total}</span>
+      </div>
+      <div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Form helpers ─────────────────────────────────────────────────────────────
+function populateSelects(){
+  const teamSel=document.getElementById('f-team');
+  const roleSel=document.getElementById('f-role');
+  const contractSel=document.getElementById('f-contract');
+  const cur1=teamSel.value, cur2=roleSel.value, cur3=contractSel.value;
+  teamSel.innerHTML='<option value="">-- Επιλογή --</option>'+
+    params.teams.map(t=>`<option>${t}</option>`).join('');
+  roleSel.innerHTML='<option value="">-- Επιλογή --</option>'+
+    params.roles.map(r=>`<option>${r}</option>`).join('');
+  contractSel.innerHTML='<option value="">-- Επιλογή --</option>'+
+    params.contractTypes.map(c=>`<option>${c}</option>`).join('');
+  const companySel=document.getElementById('f-company');
+  if(companySel){
+    const curCo=companySel.value;
+    companySel.innerHTML='<option value="">-- Επιλογή --</option>'+params.companies.map(c=>`<option>${c}</option>`).join('');
+    if(curCo) companySel.value=curCo;
+  }
+  const coFilter=document.getElementById('filterCompany');
+  if(coFilter){
+    const curF=coFilter.value;
+    coFilter.innerHTML='<option value="">Όλες οι εταιρείες</option>'+params.companies.map(c=>`<option>${c}</option>`).join('');
+    if(curF) coFilter.value=curF;
+  }
+  if(cur1) teamSel.value=cur1;
+  if(cur2) roleSel.value=cur2;
+  if(cur3) contractSel.value=cur3;
+}
+
+function checkPractice(){
+  document.getElementById('practiceBox').style.display=
+    document.getElementById('f-contract').value==='Πρακτική Άσκηση'?'block':'none';
+}
+
+function addRenewal(r={}){
+  const id='ren_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  const num=document.getElementById('renewalList').children.length+1;
+  const div=document.createElement('div');
+  div.id=id; div.className='renewal-block';
+  const typeOpts=params.contractTypes.map(ct=>`<option>${ct}</option>`).join('');
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:13px;font-weight:600;color:#555">Ανανέωση ${num}</span>
+      <button class="btn btn-sm btn-danger" onclick="document.getElementById('${id}').remove()">Αφαίρεση</button>
+    </div>
+    <div class="grid3">
+      <div><label>Τύπος Σύμβασης</label>
+        <select id="${id}_type">
+          <option value="">-- Επιλογή --</option>
+          ${typeOpts}
+        </select></div>
+      <div><label>Έναρξη</label><input id="${id}_start" type="date" value="${r.start||''}"></div>
+      <div><label>Λήξη</label><input id="${id}_end" type="date" value="${r.end||''}"></div>
+    </div>`;
+  document.getElementById('renewalList').appendChild(div);
+  if(r.type) document.getElementById(id+'_type').value=r.type;
+}
+
+function getRenewals(){
+  return [...document.getElementById('renewalList').querySelectorAll('[id^="ren_"]')].map(el=>{
+    const id=el.id;
+    return {
+      type:document.getElementById(id+'_type')?.value||'',
+      start:document.getElementById(id+'_start')?.value||'',
+      end:document.getElementById(id+'_end')?.value||''
+    };
+  });
+}
+
+function showNewForm(){
+  editingId=null; renewalCount=0;
+  ['f-name','f-mentor','f-manager','f-email','f-phone','f-practice','f-year','f-corp-email','f-corp-phone','f-ext'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-company').value='';
+  document.getElementById('f-contract').value='';
+  document.getElementById('f-start').value='';
+  document.getElementById('f-end').value='';
+  document.getElementById('practiceBox').style.display='none';
+  document.getElementById('renewalList').innerHTML='';
+  document.getElementById('inactiveBtn').style.display='none';
+  document.getElementById('deleteBtn').style.display='none';
+  populateSelects();
+  document.getElementById('f-team').value='';
+  document.getElementById('f-role').value='';
+  switchTab('form',1);
+}
+
+function editEmployee(id){
+  const emp=employees.find(e=>e.id===id);
+  if(!emp) return;
+  editingId=id;
+  document.getElementById('f-name').value=emp.name||'';
+  document.getElementById('f-mentor').value=emp.mentor||'';
+  document.getElementById('f-manager').value=emp.manager||'';
+  document.getElementById('f-email').value=emp.email||'';
+  document.getElementById('f-phone').value=emp.phone||'';
+  document.getElementById('f-year').value=emp.year||'';
+  document.getElementById('f-company').value=emp.company||'';
+  document.getElementById('f-corp-email').value=emp.corpEmail||'';
+  document.getElementById('f-corp-phone').value=emp.corpPhone||'';
+  document.getElementById('f-ext').value=emp.ext||'';
+  document.getElementById('f-contract').value=emp.contractType||'';
+  document.getElementById('f-start').value=emp.contractStart||'';
+  document.getElementById('f-end').value=emp.contractEnd||'';
+  document.getElementById('f-practice').value=emp.practiceOrg||'';
+  renewalCount=0;
+  document.getElementById('renewalList').innerHTML='';
+  (emp.renewals||[]).forEach(r=>addRenewal(r));
+  checkPractice();
+  populateSelects();
+  document.getElementById('f-team').value=emp.team||'';
+  document.getElementById('f-role').value=emp.role||'';
+  document.getElementById('deleteBtn').style.display='inline-block';
+  const iBtn=document.getElementById('inactiveBtn');
+  iBtn.style.display='inline-block';
+  iBtn.textContent=emp.inactive?'✅ Επαναφορά ως Ενεργός':'⏹ Αποχώρηση';
+  iBtn.style.borderColor=emp.inactive?'#6ee7b7':'#fca5a5';
+  iBtn.style.color=emp.inactive?'#065f46':'#92400e';
+  switchTab('form',1);
+}
+
+function saveEmployee(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Το ονοματεπώνυμο είναι υποχρεωτικό.');return;}
+  const emp={
+    id:editingId||uid(),
+    name,
+    team:document.getElementById('f-team').value,
+    role:document.getElementById('f-role').value,
+    mentor:document.getElementById('f-mentor').value.trim(),
+    manager:document.getElementById('f-manager').value.trim(),
+    email:document.getElementById('f-email').value.trim(),
+    phone:document.getElementById('f-phone').value.trim(),
+    year:document.getElementById('f-year').value.trim(),
+    company:document.getElementById('f-company').value,
+    corpEmail:document.getElementById('f-corp-email').value.trim(),
+    corpPhone:document.getElementById('f-corp-phone').value.trim(),
+    ext:document.getElementById('f-ext').value.trim(),
+    contractType:document.getElementById('f-contract').value,
+    contractStart:document.getElementById('f-start').value,
+    contractEnd:document.getElementById('f-end').value,
+    practiceOrg:document.getElementById('f-practice').value.trim(),
+    renewals:getRenewals(),
+    trainings:editingId?(employees.find(e=>e.id===editingId)||{}).trainings||{}:{}
+  };
+  if(editingId){
+    const i=employees.findIndex(e=>e.id===editingId);
+    if(i>=0) employees[i]=emp;
+  } else {
+    employees.push(emp);
+  }
+  save(); populateYearFilter(); updateStats(); renderList(); checkAlerts(); switchTab('list',0);
+}
+
+function toggleInactive(){
+  const emp=employees.find(e=>e.id===editingId);
+  if(!emp) return;
+  const becoming=!emp.inactive;
+  const msg=becoming
+    ?`Σήμανση του "${emp.name}" ως αποχωρήσαντα;`
+    :`Επαναφορά του "${emp.name}" ως ενεργού;`;
+  if(!confirm(msg)) return;
+  emp.inactive=becoming;
+  save(); populateYearFilter(); updateStats(); renderList(); checkAlerts(); switchTab('list',0);
+}
+
+function deleteEmployee(){
+  if(!confirm(`Διαγραφή του "${employees.find(e=>e.id===editingId)?.name}";\nΗ ενέργεια δεν αναιρείται.`)) return;
+  employees=employees.filter(e=>e.id!==editingId);
+  editingId=null;
+  save(); populateYearFilter(); updateStats(); renderList(); checkAlerts(); switchTab('list',0);
+}
+
+function cancelForm(){ switchTab('list',0); }
+
+// ─── Trainings tab ────────────────────────────────────────────────────────────
+function renderTrainEmpSelect(){
+  const sel=document.getElementById('trainEmpSelect');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- Επιλογή Εργαζομένου --</option>'+
+    employees.map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+function renderTrainings(){
+  const empId=document.getElementById('trainEmpSelect').value;
+  const content=document.getElementById('trainingsContent');
+  const prog=document.getElementById('trainProgress');
+  if(!empId){
+    content.innerHTML='<div class="empty-state"><div class="icon">🎓</div><div>Επίλεξε εργαζόμενο.</div></div>';
+    prog.textContent=''; return;
+  }
+  const emp=employees.find(e=>e.id===empId);
+  if(!emp) return;
+  const td=emp.trainings||{};
+  const done=params.trainings.filter(t=>td[t]?.done).length;
+  prog.textContent=`${done} / ${params.trainings.length} ολοκληρώθηκαν`;
+  content.innerHTML=`<div class="training-grid">${params.trainings.map(t=>{
+    const isDone=td[t]?.done||false;
+    const date=td[t]?.date||'';
+    return `<div class="training-item" style="${isDone?'border-color:#6ee7b7;background:#f0fdf4':''}">
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <input type="checkbox" id="tr_${CSS.escape(t)}" ${isDone?'checked':''} style="margin-top:2px"
+          onchange="toggleTraining('${empId}','${t.replace(/'/g,"\\'")}',this.checked)">
+        <div>
+          <label for="tr_${CSS.escape(t)}">${t}</label>
+          <div class="t-date" id="tdate_${CSS.escape(t)}">${date?'✓ '+formatDate(date):''}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function toggleTraining(empId,training,done){
+  const emp=employees.find(e=>e.id===empId);
+  if(!emp) return;
+  if(!emp.trainings) emp.trainings={};
+  const today=new Date().toISOString().split('T')[0];
+  emp.trainings[training]={done,date:done?today:''};
+  save();
+  // Re-render to update date input vs text
+  renderTrainings();
+}
+
+function updateTrainingDate(empId,training,newDate){
+  const emp=employees.find(e=>e.id===empId);
+  if(!emp||!emp.trainings) return;
+  emp.trainings[training]={done:true,date:newDate};
+  save();
+}
+
+function switchTrainMode(mode){
+  document.getElementById('trainPanelEmp').style.display=mode==='emp'?'block':'none';
+  document.getElementById('trainPanelFilter').style.display=mode==='filter'?'block':'none';
+  document.getElementById('trainModeEmp').classList.toggle('active',mode==='emp');
+  document.getElementById('trainModeFilter').classList.toggle('active',mode==='filter');
+  if(mode==='filter') populateTrainFilterSelect();
+}
+
+function populateTrainFilterSelect(){
+  const sel=document.getElementById('trainFilterSelect');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- Επιλογή Εκπαίδευσης --</option>'+
+    params.trainings.map(t=>`<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+function renderTrainingFilter(){
+  const training=document.getElementById('trainFilterSelect').value;
+  const status=document.getElementById('trainFilterStatus').value;
+  const content=document.getElementById('trainFilterContent');
+  const countEl=document.getElementById('trainFilterCount');
+  if(!training){
+    content.innerHTML='<div class="empty-state"><div class="icon">🔍</div><div>Επίλεξε εκπαίδευση.</div></div>';
+    countEl.textContent=''; return;
+  }
+  const activeEmps=employees.filter(e=>!e.inactive);
+  const filtered=activeEmps.filter(emp=>{
+    const done=(emp.trainings||{})[training]?.done||false;
+    if(status==='missing') return !done;
+    if(status==='done') return done;
+    return true;
+  });
+  countEl.textContent=`${filtered.length} εργαζόμενοι`;
+  if(filtered.length===0){
+    content.innerHTML='<div class="empty-state"><div class="icon">✅</div><div>Όλοι έχουν ολοκληρώσει αυτή την εκπαίδευση!</div></div>';
+    return;
+  }
+  content.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px">${filtered.map(emp=>{
+    const done=(emp.trainings||{})[training]?.done||false;
+    const date=(emp.trainings||{})[training]?.date||'';
+    return `<div style="background:#fff;border:1px solid #e0dfd8;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+      <span style="flex:1;font-weight:500">${emp.name}</span>
+      <span style="font-size:12px;color:#888">${emp.role||''}${emp.team?' · '+emp.team:''}</span>
+      ${done
+        ?`<span class="badge badge-success">✓ ${date?formatDate(date):'Ολοκληρώθηκε'}</span>`
+        :`<span class="badge badge-danger">Εκκρεμεί</span>`}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ─── Manage params ────────────────────────────────────────────────────────────
+function renderManageList(containerId, key){
+  document.getElementById(containerId).innerHTML=
+    params[key].map((item,i)=>`
+      <div class="manage-item">
+        <span style="flex:1;font-size:13px">${item}</span>
+        <button class="del-btn" onclick="removeParam('${key}',${i},'${containerId}')" title="Αφαίρεση">×</button>
+      </div>`).join('')||'<div style="font-size:13px;color:#bbb;padding:6px 0">Δεν υπάρχουν ακόμα.</div>';
+}
+function renderManageTeams(){ renderManageList('manageTeams','teams'); }
+function renderManageRoles(){ renderManageList('manageRoles','roles'); }
+function renderManageTrainings(){ renderManageList('manageTrainings','trainings'); }
+function renderManageContractTypes(){ renderManageList('manageContractTypes','contractTypes'); }
+function renderManageCompanies(){ renderManageList('manageCompanies','companies'); }
+
+function addParam(key, inputId){
+  const inp=document.getElementById(inputId);
+  const val=inp.value.trim();
+  if(!val) return;
+  if(params[key].includes(val)){alert('Υπάρχει ήδη αυτή η τιμή.');return;}
+  params[key].push(val);
+  save(); inp.value='';
+  if(key==='teams') renderManageTeams();
+  if(key==='roles') renderManageRoles();
+  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
+  if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
+  if(key==='trainings') renderManageTrainings();
+}
+
+function removeParam(key,i,containerId){
+  if(!confirm(`Αφαίρεση "${params[key][i]}";`)) return;
+  params[key].splice(i,1);
+  save();
+  if(key==='teams') renderManageTeams();
+  if(key==='roles') renderManageRoles();
+  if(key==='contractTypes'){ renderManageContractTypes(); populateSelects(); }
+  if(key==='companies'){ renderManageCompanies(); populateSelects(); updateStats(); }
+  if(key==='trainings') renderManageTrainings();
+}
+
+// ─── Import ──────────────────────────────────────────────────────────────────
+function importExcel(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  event.target.value='';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      let added=0, skipped=0;
+      rows.forEach(row=>{
+        const name=(row['Ονοματεπώνυμο']||'').trim();
+        if(!name){skipped++;return;}
+        const corpEmailVal=(row['Εταιρικό Email']||'').trim().toLowerCase();
+        if(corpEmailVal && employees.find(e=>(e.corpEmail||'').toLowerCase()===corpEmailVal)){skipped++;return;}
+        if(!corpEmailVal && employees.find(e=>e.name.toLowerCase()===name.toLowerCase())){skipped++;return;}
+        employees.push({
+          id:uid(),
+          name,
+          team:row['Ομάδα']||'',
+          role:row['Θέση']||'',
+          year:row['Έτος']?String(row['Έτος']):'',
+          mentor:row['Μέντορας']||'',
+          manager:row['Υπεύθυνος']||'',
+          email:row['Προσωπικό Email']||'',
+          phone:row['Τηλέφωνο Επικοινωνίας']||'',
+          company:row['Εταιρεία']||'',
+          corpEmail:row['Εταιρικό Email']||'',
+          corpPhone:row['Εταιρικό Τηλέφωνο']||'',
+          ext:row['Εσωτερικό Τηλ']||'',
+          contractType:row['Τύπος Σύμβασης']||'',
+          contractStart:excelDate(row['Έναρξη Σύμβασης']),
+          contractEnd:excelDate(row['Λήξη Σύμβασης']),
+          practiceOrg:row['Φορέας Πρακτικής']||'',
+          inactive:false,
+          renewals:[],
+          trainings:{}
+        });
+        added++;
+      });
+      save(); populateYearFilter(); renderList(); checkAlerts();
+      alert(`Εισαγωγή ολοκληρώθηκε.\nΠροστέθηκαν: ${added}\nΠαραλείφθηκαν (υπάρχουν ήδη ή χωρίς όνομα): ${skipped}`);
+    }catch(err){
+      alert('Σφάλμα κατά την εισαγωγή. Βεβαιώσου ότι το αρχείο έχει τη σωστή γραμμογράφηση.');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+function excelDate(val){
+  if(!val) return '';
+  // If already a string like DD/MM/YYYY or YYYY-MM-DD
+  if(typeof val==='string'){
+    val=val.trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(val)){
+      const [d,m,y]=val.split('/'); return `${y}-${m}-${d}`;
+    }
+    return '';
+  }
+  // Excel serial date number
+  if(typeof val==='number'){
+    const d=new Date(Math.round((val-25569)*86400*1000));
+    const y=d.getUTCFullYear(), m=String(d.getUTCMonth()+1).padStart(2,'0'), day=String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+  return '';
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportExcel(){
+  if(employees.length===0){alert('Δεν υπάρχουν δεδομένα για εξαγωγή.');return;}
+  const wb=XLSX.utils.book_new();
+
+  const empRows=employees.map(e=>{
+    const st=contractStatus(e);
+    const row={
+      'Ονοματεπώνυμο':e.name,'Εταιρεία':e.company,'Ομάδα':e.team,'Θέση':e.role,
+      'Έτος':e.year,'Τύπος Σύμβασης':e.contractType,'Έναρξη Σύμβασης':e.contractStart,
+      'Λήξη Σύμβασης':e.contractEnd,'Κατάσταση Σύμβασης':st?st.short:'',
+      'Φορέας Πρακτικής':e.practiceOrg,'Μέντορας':e.mentor,
+      'Υπεύθυνος':e.manager,'Προσωπικό Email':e.email,'Τηλέφωνο Επικοινωνίας':e.phone,
+      'Εταιρικό Email':e.corpEmail,'Εταιρικό Τηλέφωνο':e.corpPhone,'Εσωτερικό Τηλ':e.ext
+    };
+    (e.renewals||[]).forEach((r,i)=>{
+      row[`Ανανέωση ${i+1} - Τύπος`]=r.type;
+      row[`Ανανέωση ${i+1} - Έναρξη`]=r.start;
+      row[`Ανανέωση ${i+1} - Λήξη`]=r.end;
+    });
+    return row;
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(empRows), 'Εργαζόμενοι');
+
+  const trainRows=employees.map(emp=>{
+    const row={'Ονοματεπώνυμο':emp.name,'Ομάδα':emp.team||''};
+    params.trainings.forEach(t=>{
+      const td=(emp.trainings||{})[t]||{};
+      row[t]=td.done?(td.date?formatDate(td.date):'✓'):'';
+    });
+    return row;
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trainRows), 'Εκπαιδεύσεις');
+
+  XLSX.writeFile(wb, 'εργαζομενοι_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+// ─── Backup / Restore ─────────────────────────────────────────────────────────
+function backupJSON(){
+  if(employees.length===0 && !params){ alert('Δεν υπάρχουν δεδομένα για backup.'); return; }
+  const data = { employees, params, exportedAt: new Date().toISOString(), version: 2 };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'backup_εργαζομενοι_' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function restoreJSON(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  event.target.value = '';
+  if(!confirm('Η επαναφορά θα αντικαταστήσει ΟΛΑ τα υπάρχοντα δεδομένα.\nΘέλεις να συνεχίσεις;')) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data.employees || !data.params){
+        alert('Μη έγκυρο αρχείο backup. Βεβαιώσου ότι επιλέγεις αρχείο .json που δημιουργήθηκε από αυτή την εφαρμογή.');
+        return;
+      }
+      employees = data.employees;
+      params = data.params;
+      // ensure new keys exist for older backups
+      if(!params.companies) params.companies = ['OTS','BlueValue'];
+      save();
+      populateSelects();
+      populateYearFilter();
+      updateStats();
+      renderList();
+      checkAlerts();
+      alert('Η επαναφορά ολοκληρώθηκε! Φορτώθηκαν ' + employees.length + ' εργαζόμενοι.');
+    } catch(err){
+      alert('Σφάλμα κατά την ανάγνωση του αρχείου. Βεβαιώσου ότι είναι έγκυρο JSON.');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+populateSelects();
+populateYearFilter();
+updateStats();
+renderList();
+checkAlerts();
+</script>
+</body>
+</html>
