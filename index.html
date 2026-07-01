@@ -120,6 +120,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
       <option value="inactive">Αποχωρήσαντες</option>
     </select>
     <select id="filterCompany" onchange="renderList()" style="max-width:150px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff"><option value="">Όλες οι εταιρείες</option></select>
+    <select id="filterPractice" onchange="renderList()" style="max-width:150px;padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;color:#1a1a1a;background:#fff">
+      <option value="">Όλοι</option>
+      <option value="yes">📋 Πρακτικές</option>
+      <option value="no">Χωρίς Πρακτική</option>
+    </select>
     <div class="ms-wrap" id="contractFilterWrap">
       <button class="ms-btn" id="contractFilterBtn" onclick="toggleMsDropdown()">
         <span id="contractFilterLabel">Τύπος Σύμβασης</span><span>▾</span>
@@ -208,9 +213,15 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
       <div><label>Έναρξη *</label><input id="f-start" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
       <div><label>Λήξη</label><input id="f-end" type="text" placeholder="ηη/μμ/εεεε" maxlength="10" oninput="formatDateInput(this)"></div>
     </div>
-    <div style="margin-top:4px">
-      <label>Φορέας Πρακτικής <span style="font-size:11px;color:#aaa;font-weight:400">(συμπλήρωσε μόνο αν αφορά πρακτική)</span></label>
-      <input id="f-practice" type="text" placeholder="π.χ. ΟΑΕΔ, ΑΕΙ Αθήνας..." style="max-width:360px">
+    <div class="grid2" style="margin-top:4px">
+      <div>
+        <label>Φορέας Πρακτικής</label>
+        <input id="f-practice" type="text" placeholder="π.χ. ΟΑΕΔ, ΑΕΙ Αθήνας...">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:28px">
+        <input type="checkbox" id="f-ispractice" style="width:16px;height:16px;accent-color:#5b21b6;cursor:pointer">
+        <label for="f-ispractice" style="margin:0;font-size:13px;cursor:pointer;font-weight:500">📋 Πρακτική Άσκηση</label>
+      </div>
     </div>
   </div>
 
@@ -225,7 +236,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
   <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;align-items:center">
     <button class="btn btn-primary" onclick="saveEmployee()">✓ Αποθήκευση</button>
     <button class="btn" onclick="cancelForm()">Άκυρο</button>
-    <button class="btn" id="inactiveBtn" onclick="toggleInactive()" style="display:none;margin-left:auto">⏹ Αποχώρηση</button>
+    <div id="inactiveGroup" style="display:none;margin-left:auto;display:flex;gap:6px;align-items:center">
+      <select id="inactiveReasonSel" style="font-size:13px;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-family:inherit">
+        <option value="Λήξη Σύμβασης">Λήξη Σύμβασης</option>
+        <option value="Οικειοθελής Αποχώρηση">Οικειοθελής Αποχώρηση</option>
+        <option value="Απόλυση">Απόλυση</option>
+        <option value="Λήξη Πρακτικής">Λήξη Πρακτικής</option>
+        <option value="Άλλο">Άλλο</option>
+      </select>
+      <button class="btn" id="inactiveBtn" onclick="toggleInactive()">⏹ Αποχώρηση</button>
+    </div>
     <button class="btn btn-danger" id="deleteBtn" onclick="deleteEmployee()" style="display:none">🗑 Διαγραφή</button>
   </div>
 </div>
@@ -403,7 +423,7 @@ function switchTab(id, idx){
   document.getElementById(id).classList.add('active');
   document.querySelectorAll('.tab')[idx].classList.add('active');
   if(id==='list'){ populateContractFilter(); renderList(); }
-  if(id==='trainings-tab'){ renderTrainEmpSelect(); renderTrainings(); populateTrainFilterSelect(); }
+  if(id==='trainings-tab'){ renderTrainEmpSelect(); if(lastEditedEmpId){ document.getElementById('trainEmpSelect').value=lastEditedEmpId; } renderTrainings(); populateTrainFilterSelect(); }
   if(id==='manage'){ renderManageTeams(); renderManageRoles(); renderManageContractTypes(); renderManageCompanies(); renderManageCities(); renderManageBuildings(); renderManageTrainings(); loadFaParams(); }
   checkAlerts();
 }
@@ -583,6 +603,7 @@ function clearFilters(){
   document.getElementById('filterYear').value='';
   document.getElementById('filterStatus').value='active';
   document.getElementById('filterCompany').value='';
+  document.getElementById('filterPractice').value='';
   selectedContracts.clear();
   populateContractFilter();
   renderList();
@@ -681,7 +702,7 @@ function renderList(){
         <div>
           <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
             <div class="emp-name">${emp.name}</div>
-            ${emp.inactive?`<span class="badge badge-gray">Αποχώρησε</span>`:''}
+            ${emp.inactive?`<span class="badge badge-gray">Αποχώρησε${emp.inactiveReason?' · '+emp.inactiveReason:''}</span>`:''}
           </div>
           <div class="emp-meta">${[emp.company,emp.role,emp.team,emp.year?'Έτος '+emp.year:''].filter(Boolean).join(' · ')}</div>
         </div>
@@ -689,6 +710,7 @@ function renderList(){
       </div>
       <div class="emp-badges">
         ${emp.contractType?`<span class="badge badge-info" style="cursor:default">${emp.contractType}</span>`:''}
+        ${emp.isPractice?'<span class="badge" style="background:#ede9fe;color:#5b21b6">📋 Πρακτική</span>':''}
         ${emp.contractStart?`<span style="font-size:11px;color:#999">από ${formatDate(emp.contractStart)}</span>`:''}
         <span style="font-size:11px;color:#999;margin-left:auto">🎓 ${done}/${total}</span>
       </div>
@@ -780,8 +802,10 @@ function showNewForm(){
   document.getElementById('f-end').value='';
   document.getElementById('practiceBox').style.display='none';
   document.getElementById('renewalList').innerHTML='';
-  document.getElementById('inactiveBtn').style.display='none';
+  document.getElementById('inactiveGroup').style.display='none';
   document.getElementById('deleteBtn').style.display='none';
+  document.getElementById('f-ispractice').checked=false;
+  document.getElementById('inactiveReasonSel').value='Λήξη Σύμβασης';
   populateSelects();
   document.getElementById('f-team').value='';
   document.getElementById('f-role').value='';
@@ -792,6 +816,7 @@ function editEmployee(id){
   const emp=employees.find(e=>e.id===id);
   if(!emp) return;
   editingId=id;
+  lastEditedEmpId=id;
   document.getElementById('f-name').value=emp.name||'';
   document.getElementById('f-mentor').value=emp.mentor||'';
   document.getElementById('f-manager').value=emp.manager||'';
@@ -811,6 +836,8 @@ function editEmployee(id){
   document.getElementById('f-start').value=fromISO(emp.contractStart||'');
   document.getElementById('f-end').value=fromISO(emp.contractEnd||'');
   document.getElementById('f-practice').value=emp.practiceOrg||'';
+  document.getElementById('f-ispractice').checked=emp.isPractice||false;
+  document.getElementById('inactiveReasonSel').value=emp.inactiveReason||'Λήξη Σύμβασης';
   renewalCount=0;
   document.getElementById('renewalList').innerHTML='';
   (emp.renewals||[]).forEach(r=>addRenewal(r));
@@ -818,11 +845,12 @@ function editEmployee(id){
   document.getElementById('f-team').value=emp.team||'';
   document.getElementById('f-role').value=emp.role||'';
   document.getElementById('deleteBtn').style.display='inline-block';
+  document.getElementById('inactiveGroup').style.display='flex';
   const iBtn=document.getElementById('inactiveBtn');
-  iBtn.style.display='inline-block';
   iBtn.textContent=emp.inactive?'✅ Επαναφορά ως Ενεργός':'⏹ Αποχώρηση';
   iBtn.style.borderColor=emp.inactive?'#6ee7b7':'#fca5a5';
   iBtn.style.color=emp.inactive?'#065f46':'#92400e';
+  document.getElementById('inactiveReasonSel').style.display=emp.inactive?'none':'inline-block';
   switchTab('form',1);
 }
 
@@ -851,6 +879,8 @@ function saveEmployee(){
     contractStart:toISO(document.getElementById('f-start').value),
     contractEnd:toISO(document.getElementById('f-end').value),
     practiceOrg:document.getElementById('f-practice').value.trim(),
+    isPractice:document.getElementById('f-ispractice').checked,
+    inactiveReason:document.getElementById('inactiveReasonSel').value,
     renewals:getRenewals(),
     trainings:editingId?(employees.find(e=>e.id===editingId)||{}).trainings||{}:{}
   };
@@ -867,11 +897,13 @@ function toggleInactive(){
   const emp=employees.find(e=>e.id===editingId);
   if(!emp) return;
   const becoming=!emp.inactive;
+  const reason=document.getElementById('inactiveReasonSel').value||'Λήξη Σύμβασης';
   const msg=becoming
-    ?`Σήμανση του "${emp.name}" ως αποχωρήσαντα;`
+    ?`Αποχώρηση του "${emp.name}" (${reason});`
     :`Επαναφορά του "${emp.name}" ως ενεργού;`;
   if(!confirm(msg)) return;
   emp.inactive=becoming;
+  emp.inactiveReason=becoming?reason:'';
   save(); populateYearFilter(); updateStats(); renderList(); checkAlerts(); switchTab('list',0);
 }
 
@@ -885,6 +917,8 @@ function deleteEmployee(){
 function cancelForm(){ switchTab('list',0); }
 
 // ─── Trainings tab ────────────────────────────────────────────────────────────
+let lastEditedEmpId=null;
+
 function renderTrainEmpSelect(){
   const sel=document.getElementById('trainEmpSelect');
   const cur=sel.value;
@@ -1081,6 +1115,7 @@ function importExcel(event){
           company:row['Εταιρεία']||'',
           city:row['Πόλη Εργασίας']||'',
           building:row['Κτήριο Εργασίας']||'',
+          isPractice:(row['Πρακτική Άσκηση']||'').toString().toUpperCase()==='ΝΑΙ',
           firstAid:(row['Πρώτες Βοήθειες']||'').toString().toUpperCase()==='ΝΑΙ',
           firstAidDate:excelDate(row['Ημ/νία Πιστοποίησης ΠΒ'])||'',
           corpEmail:row['Εταιρικό Email']||'',
@@ -1100,7 +1135,7 @@ function importExcel(event){
         if(existing){
           // Check for any differences
           const fields=['name','team','role','year','mentor','manager','email','phone',
-            'company','city','building','firstAid','firstAidDate','corpEmail','corpPhone','ext',
+            'company','city','building','isPractice','firstAid','firstAidDate','corpEmail','corpPhone','ext',
             'contractType','contractStart','contractEnd','practiceOrg'];
           const hasChanges=fields.some(f=>String(incoming[f]??'')!==String(existing[f]??''));
           if(!hasChanges){skipped++;return;}
@@ -1174,7 +1209,7 @@ function exportExcel(){
       'Ονοματεπώνυμο':e.name,'Εταιρεία':e.company,'Ομάδα':e.team,'Θέση':e.role,
       'Έτος':e.year,'Τύπος Σύμβασης':e.contractType,'Έναρξη Σύμβασης':e.contractStart,
       'Λήξη Σύμβασης':e.contractEnd,'Κατάσταση Σύμβασης':st?st.short:'',
-      'Φορέας Πρακτικής':e.practiceOrg,'Μέντορας':e.mentor,
+      'Πρακτική Άσκηση':e.isPractice?'ΝΑΙ':'','Φορέας Πρακτικής':e.practiceOrg,'Μέντορας':e.mentor,
       'Υπεύθυνος':e.manager,'Προσωπικό Email':e.email,'Τηλέφωνο Επικοινωνίας':e.phone,
       'Πόλη Εργασίας':e.city,'Κτήριο Εργασίας':e.building,'Πρώτες Βοήθειες':e.firstAid?'ΝΑΙ':'','Ημ/νία Πιστοποίησης ΠΒ':e.firstAidDate||'',
       'Εταιρικό Email':e.corpEmail,'Εταιρικό Τηλέφωνο':e.corpPhone,'Εσωτερικό Τηλ':e.ext
